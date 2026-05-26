@@ -23,7 +23,6 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        /* 新增：三大心態提示框樣式 */
         .warning-box {
             background-color: #fffaf0;
             border: 1px solid #e2d4b7;
@@ -43,6 +42,29 @@
             font-size: 14px;
             line-height: 1.6;
             color: #555;
+        }
+        .question-box {
+            margin: 20px 0;
+        }
+        .question-box label {
+            display: block;
+            font-weight: bold;
+            color: #5c3d2e;
+            margin-bottom: 8px;
+        }
+        .question-box input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+        .question-box input:focus {
+            border-color: #865439;
+            outline: none;
+            background-color: #fff;
         }
         .btn-container {
             text-align: center;
@@ -68,30 +90,45 @@
         .coins {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin: 15px 0;
+            gap: 25px;
+            margin: 25px 0;
             font-size: 24px;
+            perspective: 1000px; /* 啟用3D透視 */
         }
         .coin {
-            width: 60px;
-            height: 60px;
+            width: 65px;
+            height: 65px;
             border-radius: 50%;
             background-color: #ffd700;
-            border: 2px solid #daa520;
+            border: 3px solid #daa520;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            color: #8b6508;
+            transition: transform 0.6s ease-out;
         }
         .coin.back {
             background-color: #e5e5e5;
             border-color: #b5b5b5;
+            color: #666;
         }
+        
+        /* 新增：硬幣轉動的動畫樣式 */
+        @keyframes spin {
+            0% { transform: translateY(0) rotateX(0deg); }
+            50% { transform: translateY(-50px) rotateX(900deg); } /* 往上彈跳並瘋狂翻轉 */
+            100% { transform: translateY(0) rotateX(1800deg); }
+        }
+        .coin.spinning {
+            animation: spin 0.6s ease-out;
+        }
+
         .hexagram-display {
             margin-top: 20px;
             display: flex;
-            flex-direction: column-reverse; /* 易經由下往上畫 */
+            flex-direction: column-reverse; /* 由下往上畫 */
             align-items: center;
             gap: 8px;
         }
@@ -127,12 +164,15 @@
         <ul>
             <li><strong>不誠不占：</strong>心不誠、抱著好玩試探的心態，算出來往往不準。</li>
             <li><strong>不疑不占：</strong>已經知道答案、或者心中沒有真正疑惑的事情，不需要占卜。</li>
-            <li><strong>不義不占：</strong>想做壞事、害人、或者投機取巧（例如問明晚六合彩開幾號），《易經》不會給你答案。</li>
         </ul>
-        <p style="margin: 10px 0 0 0; font-size: 14px; color: #865439; font-weight: bold; text-align: center;">請在心中默想你想請教的問題，誠心按下按鈕開始。</p>
     </div>
 
     <div class="container">
+        <div class="question-box">
+            <label for="user-question">❓ 請輸入您想請教的問題（選填，方便整合複製）：</label>
+            <input type="text" id="user-question" placeholder="例如：這週面試新工作的發展順利嗎？">
+        </div>
+
         <div class="btn-container">
             <button id="toss-btn" onclick="tossCoins()">擲硬幣 (<span id="count">0</span>/6)</button>
             <button id="reset-btn" onclick="resetAll()" style="background-color: #777; margin-left: 10px;">重來</button>
@@ -152,7 +192,7 @@
             <h2>占卜結果分析</h2>
             <div id="result-text"></div>
             <div style="text-align: right;">
-                <button class="copy-btn" id="copy-btn" onclick="copyToClipboard()">📋 複製卦象與結果</button>
+                <button class="copy-btn" id="copy-btn" onclick="copyToClipboard()">📋 複製問題與結果（發給AI分析）</button>
             </div>
         </div>
     </div>
@@ -160,30 +200,60 @@
     <script>
         let history = []; 
         let rawLinesText = []; 
+        let finalAdviceText = ""; 
+        let isSpinning = false; // 防連點狀態
 
         function tossCoins() {
-            if (history.length >= 6) return;
+            if (history.length >= 6 || isSpinning) return;
 
+            isSpinning = true;
+            let tossBtn = document.getElementById("toss-btn");
+            tossBtn.disabled = true; // 動畫期間停用按鈕
+
+            // 隨機產生最後結果 (0反, 1正)
             let c1 = Math.floor(Math.random() * 2);
             let c2 = Math.floor(Math.random() * 2);
             let c3 = Math.floor(Math.random() * 2);
 
+            let coin1 = document.getElementById("coin1");
+            let coin2 = document.getElementById("coin2");
+            let coin3 = document.getElementById("coin3");
+
+            // 顯示硬幣區塊並加上旋轉動畫效果
             document.getElementById("coins-display").style.display = "flex";
-            updateCoinDOM("coin1", c1);
-            updateCoinDOM("coin2", c2);
-            updateCoinDOM("coin3", c3);
+            coin1.classList.add("spinning");
+            coin2.classList.add("spinning");
+            coin3.classList.add("spinning");
+            
+            // 轉動時先顯示問號
+            coin1.innerText = "?"; coin2.innerText = "?"; coin3.innerText = "?";
+            coin1.classList.remove("back"); coin2.classList.remove("back"); coin3.classList.remove("back");
 
-            let score = (c1 ? 3 : 2) + (c2 ? 3 : 2) + (c3 ? 3 : 2);
-            history.push(score);
+            // 0.6 秒後動畫結束，揭曉正反面並結算卦象
+            setTimeout(() => {
+                coin1.classList.remove("spinning");
+                coin2.classList.remove("spinning");
+                coin3.classList.remove("spinning");
 
-            document.getElementById("count").innerText = history.length;
+                updateCoinDOM("coin1", c1);
+                updateCoinDOM("coin2", c2);
+                updateCoinDOM("coin3", c3);
 
-            renderHexagram();
+                let score = (c1 ? 3 : 2) + (c2 ? 3 : 2) + (c3 ? 3 : 2);
+                history.push(score);
 
-            if (history.length === 6) {
-                document.getElementById("toss-btn").disabled = true;
-                analyzeResult();
-            }
+                document.getElementById("count").innerText = history.length;
+
+                renderHexagram();
+
+                isSpinning = false;
+                
+                if (history.length < 6) {
+                    tossBtn.disabled = false; // 恢復按鈕
+                } else {
+                    analyzeResult();
+                }
+            }, 600);
         }
 
         function updateCoinDOM(id, val) {
@@ -216,8 +286,6 @@
             });
         }
 
-        let finalAdviceText = ""; 
-
         function analyzeResult() {
             let changeLines = [];
             history.forEach((score, index) => {
@@ -233,7 +301,7 @@
             let adviceHTML = `<strong>變爻數量：${changeLines.length} 個</strong><br><br>`;
             adviceHTML += `根據宋代朱熹的《易學啟蒙》解卦黃金法則，你應該看：<br><br>`;
 
-            let adviceRaw = `變爻數量：${changeLines.length} 個\n\n根據宋代朱熹的《易學啟蒙']》解卦黃金法則，你應該看：\n\n`;
+            let adviceRaw = `變爻數量：${changeLines.length} 個\n根據宋代朱熹的《易學啟蒙》解卦黃金法則，解卦核心指引如下：\n`;
 
             if (changeLines.length === 0) {
                 let t = `👉 請查閱：【本卦的卦辭】。\n目前大局非常穩定，事情的吉凶完全由本卦的總體評語決定。`;
@@ -269,25 +337,30 @@
                 adviceRaw += t;
             }
 
+            resultDiv.scrollIntoView({ behavior: 'smooth' }); // 自動平滑滾動到結果區
             resultText.innerHTML = adviceHTML;
             finalAdviceText = adviceRaw; 
         }
 
         function copyToClipboard() {
             let orderedLines = [...rawLinesText].reverse().join("\n");
+            let question = document.getElementById("user-question").value.trim();
+            if (!question) { question = "（未填寫具體問題）"; }
             
-            let textToCopy = `【易經金錢卦占卜紀錄】\n\n`;
-            textToCopy += `☯️ 卦象（由上至下）：\n${orderedLines}\n\n`;
-            textToCopy += `📝 占卜結果分析：\n${finalAdviceText}\n\n`;
+            let textToCopy = `【易經金錢卦 AI 占卜分析請求】\n\n`;
+            textToCopy += `❓ 占卜問題：\n${question}\n\n`;
+            textToCopy += `☯️ 卦象紀錄（由上至下排列，即第6爻到第1爻）：\n${orderedLines}\n\n`;
+            textToCopy += `📝 朱熹解卦核心指引：\n${finalAdviceText}\n\n`;
+            textToCopy += `請 AI 助手根據以上問題、得到的卦象以及解卦指引，為我詳細解讀本卦、變卦的含意，並給出具體的建議。謝謝！\n\n`;
             textToCopy += `（占卜時間：${new Date().toLocaleString()}）`;
 
             navigator.clipboard.writeText(textToCopy).then(() => {
                 let copyBtn = document.getElementById("copy-btn");
-                copyBtn.innerText = "✅ 已成功複製！";
+                copyBtn.innerText = "✅ 複製成功！可直接貼給 AI";
                 copyBtn.style.backgroundColor = "#2f855a"; 
                 
                 setTimeout(() => {
-                    copyBtn.innerText = "📋 複製卦象與結果";
+                    copyBtn.innerText = "📋 複製問題與結果（發給AI分析）";
                     copyBtn.style.backgroundColor = "#4a5568";
                 }, 2000);
             }).catch(err => {
@@ -299,6 +372,8 @@
             history = [];
             rawLinesText = [];
             finalAdviceText = "";
+            isSpinning = false;
+            document.getElementById("user-question").value = ""; 
             document.getElementById("count").innerText = "0";
             document.getElementById("hexagram").innerHTML = "";
             document.getElementById("result").style.display = "none";
